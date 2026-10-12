@@ -58,6 +58,7 @@ $usedocx = '1'
 # $keepdocx = 1 # Deliberately omit a configuration option from
 $prefixFolders = 1
 $medialocation = 1
+$mergeInkStrokes = 1
 $conversion = 'markdown-simple_tables-multiline_tables-grid_tables+pipe_tables' # Default
 $headerTimestampEnabled = 1
 $keepspaces = 1
@@ -85,6 +86,7 @@ $newlineCharacter = 1
             $fakeUserInputs['prefixFolders']['value'] = ''
             $fakeUserInputs['mdFileNameAndFolderNameMaxLength']['value'] = ''
             $fakeUserInputs['medialocation']['value'] = ''
+            $fakeUserInputs['mergeInkStrokes']['value'] = ''
             $fakeUserInputs['conversion']['value'] = ''
             $fakeUserInputs['headerTimestampEnabled']['value'] = ''
             $fakeUserInputs['keepspaces']['value'] = ''
@@ -732,6 +734,16 @@ AAAAAElFTkSuQmCC</one:Data>
             </one:OE>
         </one:OEChildren>
     </one:Outline>
+    <one:InkDrawing lastModifiedTime="2021-08-06T16:08:30.000Z" objectID="{902AD630-91B7-4D8B-96A7-107572724072}{60}{B0}">
+        <one:Position x="74.25" y="449.25" z="1" />
+        <one:Size width="15.0" height="30.0" />
+        <one:Data>ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg1SsxnAED4DQiU=</one:Data>
+    </one:InkDrawing>
+    <one:InkDrawing lastModifiedTime="2021-08-06T16:08:31.000Z" objectID="{902AD630-91B7-4D8B-96A7-107572724072}{61}{B0}">
+        <one:Position x="96.75" y="464.25" z="2" />
+        <one:Size width="22.5" height="0.0" />
+        <one:Data>ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg41wQiQEEAUQBQ=</one:Data>
+    </one:InkDrawing>
     <one:InsertedFile selected="all" pathCache="C:\Users\LeonardJonathan\AppData\Local\Microsoft\OneNote\16.0\cache\00001BNS.bin" pathSource="C:\Users\LeonardJonathan\Desktop\attachment3.txt" preferredName="attachment3.txt" />
     <one:InsertedFile selected="all" pathCache="C:\Users\LeonardJonathan\AppData\Local\Microsoft\OneNote\16.0\cache\00001BNS.bin" pathSource="C:\Users\LeonardJonathan\Desktop\attachment4.txt" preferredName="attachment4.txt" />
 </one:Page>
@@ -1191,6 +1203,36 @@ Describe 'New-SectionGroupConversionConfig' -Tag 'Unit' {
             }
         }
 
+        It "Should honor config mergeInkStrokes" {
+            $params['Config']['mergeInkStrokes']['value'] = 1
+
+            $result = @( New-SectionGroupConversionConfig @params 6>$null )
+
+            # 15 pages from 'test' notebook, 15 pages from 'test2' notebook
+            $result.Count | Should -Be 48
+
+            foreach ($pageCfg in $result) {
+                $pageCfg['inkDrawings'].Count | Should -Be 0
+            }
+
+            $params['Config']['mergeInkStrokes']['value'] = 2
+
+            $result = @( New-SectionGroupConversionConfig @params 6>$null )
+
+            # 15 pages from 'test' notebook, 15 pages from 'test2' notebook
+            $result.Count | Should -Be 48
+
+            foreach ($pageCfg in $result) {
+                $pageCfg['inkDrawings'].Count | Should -Be 2
+                $pageCfg['inkDrawings'][0]['width'] | Should -Be 15
+                $pageCfg['inkDrawings'][0]['height'] | Should -Be 30
+                $pageCfg['inkDrawings'][0]['data'] | Should -Be 'ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg1SsxnAED4DQiU='
+                $pageCfg['inkDrawings'][1]['width'] | Should -Be 22.5
+                $pageCfg['inkDrawings'][1]['height'] | Should -Be 0
+                $pageCfg['inkDrawings'][1]['data'] | Should -Be 'ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg41wQiQEEAUQBQ='
+            }
+        }
+
         It "Should honor config keepspaces" {
             $params['Config']['keepspaces']['value'] = 1
 
@@ -1528,6 +1570,184 @@ foo`r`nbar`r`nbaz
 
 }
 
+Describe 'Get-DocxImages' -Tag 'Unit' {
+
+    Context 'Behavior' {
+
+        It "Gets the images of a .docx file in document order, with their file names and display sizes in points" {
+            $documentXml = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <w:body>
+        <w:p><w:r><w:drawing><wp:inline><wp:extent cx="952500" cy="1270000"/><wp:docPr id="1" name="Picture 1"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:blipFill><a:blip r:embed="rId5"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+        <w:p><w:r><w:t>foo</w:t></w:r></w:p>
+        <w:p><w:r><w:drawing><wp:anchor><wp:extent cx="127000" cy="254000"/><wp:docPr id="2" name="Picture 2"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:blipFill><a:blip r:embed="rId6"/></pic:blipFill></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p>
+    </w:body>
+</w:document>
+'@
+            $relationshipsXml = @'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>
+    <Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image2.png"/>
+    <Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com" TargetMode="External"/>
+</Relationships>
+'@
+            $docx = Join-Path $TestDrive 'test.docx'
+            Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+            $zip = [System.IO.Compression.ZipFile]::Open($docx, 'Create')
+            try {
+                foreach ($entry in @( @('word/document.xml', $documentXml), @('word/_rels/document.xml.rels', $relationshipsXml) )) {
+                    $writer = New-Object System.IO.StreamWriter($zip.CreateEntry($entry[0]).Open())
+                    try {
+                        $writer.Write($entry[1])
+                    }finally {
+                        $writer.Dispose()
+                    }
+                }
+            }finally {
+                $zip.Dispose()
+            }
+
+            $result = @( Get-DocxImages -Path $docx )
+
+            $result.Count | Should -Be 2
+            $result[0]['fileName'] | Should -Be 'image1.png'
+            $result[0]['width'] | Should -Be 75
+            $result[0]['height'] | Should -Be 100
+            $result[1]['fileName'] | Should -Be 'image2.png'
+            $result[1]['width'] | Should -Be 10
+            $result[1]['height'] | Should -Be 20
+        }
+
+    }
+
+}
+
+Describe 'New-InkDrawingImage' -Tag 'Unit' {
+
+    Context 'Behavior' {
+
+        It "Renders the strokes of ink drawing(s) into a single .png image, and returns its size in points" -Skip:($env:OS -notmatch 'windows') {
+            $destination = Join-Path $TestDrive 'ink.png'
+            $inkDrawings = @(
+                [ordered]@{ width = 15; height = 30; data = 'ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg1SsxnAED4DQiU=' }
+                [ordered]@{ width = 22.5; height = 0; data = 'ACoDC0gQRICArARFNUY1EQAAgD8fCREAAAAAAADwPwoLAg41wQiQEEAUQBQ=' }
+            )
+
+            $result = New-InkDrawingImage -InkDrawing $inkDrawings -Destination $destination
+
+            # Both strokes, plus padding
+            [Math]::Round($result['width'], 1) | Should -Be 49.5
+            [Math]::Round($result['height'], 1) | Should -Be 34.5
+            $bytes = [System.IO.File]::ReadAllBytes($destination)
+            $bytes[1..3] | Should -Be @( 0x50, 0x4E, 0x47 ) # 'PNG'
+        }
+
+    }
+
+}
+
+Describe 'Merge-InkDrawingStrokes' -Tag 'Unit' {
+
+    Context 'Behavior' {
+
+        BeforeEach {
+            function Get-Content { # Create this function for the sake of a "bug" in pester where calls to the Get-Content mock spits out a non-terminating pester error: A parameter cannot be found that matches parameter name 'Raw'
+                param (
+                    [Parameter()]
+                    [string]
+                    $Path
+                ,
+                    [Parameter()]
+                    [string]
+                    $LiteralPath
+                ,
+                    [Parameter()]
+                    [switch]
+                    $Raw
+                )
+                ''
+            }
+            Mock Get-Content {
+                @'
+![some text](c:/temp/tmp/media/image1.png){width="1.0417in" height="1.3889in"}
+
+![](c:/temp/tmp/media/image2.png){width="0.3229in" height="0.5313in"}![](c:/temp/tmp/media/image3.png){width="0.4271in" height="0.1146in"}
+
+foo ![](c:/temp/tmp/media/image4.png)
+'@
+            }
+            function Set-ContentNoBom {
+                param (
+                    [Parameter()]
+                    [string]
+                    $LiteralPath
+                ,
+                    [Parameter()]
+                    [string]
+                    $Value
+                )
+            }
+            Mock Set-ContentNoBom {}
+            Mock Remove-Item {}
+            Mock New-InkDrawingImage {
+                @{
+                    width = 49.5
+                    height = 34.5
+                }
+            }
+            Mock Get-DocxImages {
+                [ordered]@{ fileName = 'image1.png'; width = 75; height = 100 } # Not a stroke
+                [ordered]@{ fileName = 'image2.png'; width = 23.25; height = 38.25 } # 1st stroke
+                [ordered]@{ fileName = 'image3.png'; width = 30.75; height = 8.25 } # 2nd stroke
+                [ordered]@{ fileName = 'image4.png'; width = 23.25; height = 38.25 } # 3rd stroke
+            }
+            $pageCfg = [ordered]@{
+                docxExportFilePath = 'c:\temp\notes\docx\page.docx'
+                filePath = 'c:\temp\notes\page.md'
+                mediaPathPandoc = 'c:/temp/tmp/media'
+                inkDrawings = @(
+                    [ordered]@{ width = 15; height = 30; data = 'foo' }
+                    [ordered]@{ width = 22.5; height = 0; data = 'bar' }
+                    [ordered]@{ width = 15; height = 30; data = 'baz' }
+                )
+            }
+        }
+
+        It "Merges adjacent stroke images into a single image, and keeps other images" {
+            $expectedContent = @'
+![some text](c:/temp/tmp/media/image1.png){width="1.0417in" height="1.3889in"}
+
+![](c:/temp/tmp/media/image2.png){width="0.6875in" height="0.4792in"}
+
+foo ![](c:/temp/tmp/media/image4.png)
+'@
+
+            Merge-InkDrawingStrokes -PageConfig $pageCfg
+
+            Assert-MockCalled -CommandName New-InkDrawingImage -Times 2 -Scope It
+            Assert-MockCalled -CommandName New-InkDrawingImage -ParameterFilter { $InkDrawing.Count -eq 2 -and $InkDrawing[0]['data'] -eq 'foo' -and $InkDrawing[1]['data'] -eq 'bar' -and $Destination -match 'image2\.png$' } -Times 1 -Scope It
+            Assert-MockCalled -CommandName New-InkDrawingImage -ParameterFilter { $InkDrawing.Count -eq 1 -and $InkDrawing[0]['data'] -eq 'baz' -and $Destination -match 'image4\.png$' } -Times 1 -Scope It
+            Assert-MockCalled -CommandName Remove-Item -ParameterFilter { $LiteralPath -match 'image3\.png$' } -Times 1 -Scope It
+            Assert-MockCalled -CommandName Set-ContentNoBom -ParameterFilter { $Value -eq $expectedContent } -Times 1 -Scope It
+        }
+
+        It "Does nothing if no stroke images are identified" {
+            Mock Get-DocxImages {
+                [ordered]@{ fileName = 'image1.png'; width = 75; height = 100 }
+            }
+
+            Merge-InkDrawingStrokes -PageConfig $pageCfg
+
+            Assert-MockCalled -CommandName New-InkDrawingImage -Times 0 -Scope It
+            Assert-MockCalled -CommandName Set-ContentNoBom -Times 0 -Scope It
+        }
+
+    }
+
+}
+
 Describe 'Convert-OneNotePage' -Tag 'Unit' {
     function New-FakeSectionGroupConversionConfig {
         function Get-OneNotePageContent {}
@@ -1760,6 +1980,29 @@ Describe 'Convert-OneNotePage' -Tag 'Unit' {
 
             Assert-MockCalled -CommandName Get-ChildItem -Times 1 -Scope It
             Assert-MockCalled -CommandName Move-Item -Times 1 -Scope It
+        }
+
+        It "Merges ink drawing strokes into single images" {
+            Mock Merge-InkDrawingStrokes {}
+
+            Convert-OneNotePage @params 6>$null
+
+            Assert-MockCalled -CommandName Merge-InkDrawingStrokes -Times 0 -Scope It
+
+            $params['ConversionConfig']['inkDrawings'] = @( [ordered]@{ width = 15; height = 30; data = 'foo' } )
+
+            Convert-OneNotePage @params 6>$null
+
+            Assert-MockCalled -CommandName Merge-InkDrawingStrokes -Times 1 -Scope It
+        }
+
+        It "Does not halt conversion if merging ink drawing strokes fails" {
+            Mock Merge-InkDrawingStrokes { throw 'foo' }
+            $params['ConversionConfig']['inkDrawings'] = @( [ordered]@{ width = 15; height = 30; data = 'foo' } )
+
+            $err = Convert-OneNotePage @params 6>$null 2>&1
+
+            $err.Exception.Message | Select-Object -First 1 | Should -match 'Failed to merge ink drawing strokes'
         }
 
         It "Does not halt conversion if renaming image(s) fails" {
