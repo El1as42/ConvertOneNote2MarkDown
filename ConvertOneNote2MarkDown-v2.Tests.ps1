@@ -1853,6 +1853,14 @@ Describe 'Convert-OneNotePage' -Tag 'Unit' {
             Assert-MockCalled -CommandName Set-ContentNoBom -ParameterFilter { $LiteralPath } -Times 1 -Scope It
         }
 
+        It "Does not halt conversion if mutating markdown content fails, and reports the markdown file path" {
+            Mock Get-Content -ParameterFilter { $LiteralPath -and ! $Raw } { throw }
+
+            $err = Convert-OneNotePage @params 6>$null 2>&1
+
+            $err.Exception.Message | Select-Object -First 1 | Should -match "Failed to mutate markdown content of $( [regex]::Escape($params['ConversionConfig']['filePathNormal']) )"
+        }
+
         It "Does a dry run" {
             Mock New-Item { 'foo' }
             Mock Remove-Item { 'foo' }

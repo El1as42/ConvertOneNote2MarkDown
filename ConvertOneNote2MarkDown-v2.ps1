@@ -1303,7 +1303,7 @@ Function Convert-OneNotePage {
                     Set-ContentNoBom -LiteralPath $pageCfg['filePath'] -Value $content -ErrorAction Stop # Use -LiteralPath so that characters like '(', ')', '[', ']', '`', "'", '"' are supported. Or else we will get an error "Cannot find path 'xxx' because it does not exist"
                 }
             }catch {
-                Write-Error "Failed to mutate markdown content: $( $_.Exception.Message )"
+                Write-Error "Failed to mutate markdown content of $( $pageCfg['filePathNormal'] ). Exception: $( $_.Exception.Message )"
             }
 
             "Markdown file ready: $( $pageCfg['filePathNormal'] )" | Write-Host -ForegroundColor Green
