@@ -404,7 +404,7 @@ Function Truncate-PathFileName {
         $name = Split-Path $Path -Leaf
         if ($name.Length -gt $maxLength) {
             $parent = Split-Path $Path -Parent
-            $truncatedName = $name.Substring(0, $maxLength)
+            $truncatedName = $name.Substring(0, $maxLength).TrimEnd('.', ' ') # Windows does not support file or folder names ending with periods or spaces
             [io.path]::combine( $parent, $truncatedName )
         }else {
             $Path
@@ -433,6 +433,8 @@ Function Remove-InvalidFileNameChars {
                 } else {
                     $newName -replace "\s", "-"
                 }
+    # Remove trailing periods and spaces. Windows strips them from file and folder names, so a folder 'foo.' would be created as 'foo', and long paths like '\\?\C:\notes\foo.\bar.md' would not be found
+    $newName = $newName.TrimEnd('.', ' ')
     return $newName
 }
 
