@@ -49,7 +49,7 @@ $mdFileNameAndFolderNameMaxLength = 32
 # 2: Separate 'media' folder for each folder in the hierarchy
 $medialocation = 1
 
-# Whether to merge the strokes of pen/hand written drawings (InkDrawing) into a single image that preserves the position of each stroke. Requires Windows
+# Whether to merge the strokes of pen/hand written drawings (InkDrawing) into a single image that preserves the position of each stroke. Strokes drawn on an image are drawn on that image. Requires Windows
 # 1: Don't merge. Each stroke is converted to a separate image - Default
 # 2: Merge strokes into a single image
 $mergeInkStrokes = 1
