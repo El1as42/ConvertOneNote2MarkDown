@@ -885,6 +885,27 @@ Describe 'New-SectionGroupConversionConfig' -Tag 'Unit' {
             }
         }
 
+        It "Should generate unique media file names for each page, even for subpages and identically-named pages of a Section" {
+            foreach ($medialocation in 1, 2) {
+                $params['Config']['medialocation']['value'] = $medialocation
+                foreach ($fakeHierarchy in @( (Get-FakeOneNoteHierarchy), (Get-FakeOneNoteHierarchyWithDuplicatePageNames) )) {
+                    $params['SectionGroups'] = $fakeHierarchy.Notebooks.Notebook
+                    $result = @( New-SectionGroupConversionConfig @params 6>$null )
+
+                    # Media file names must be unique within each media folder
+                    $result | Group-Object { [io.path]::combine( $_['mediaPath'], $_['mediaNamePrefix'] ) } | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name } | Should -Be $null
+                }
+            }
+
+            # Media file names of first level pages that are not identically-named are unchanged
+            $params['Config']['medialocation']['value'] = 1
+            $params['SectionGroups'] = (Get-FakeOneNoteHierarchy).Notebooks.Notebook
+            $result = @( New-SectionGroupConversionConfig @params 6>$null )
+            foreach ($pageCfg in @( $result | Where-Object { $_['pageLevel'] -eq 1 } )) {
+                $pageCfg['mediaNamePrefix'] | Should -Be $pageCfg['pathFromRootCompat']
+            }
+        }
+
         It "Should honor config notesdestpath" {
             if ($env:OS -match 'windows') {
                 $params['Config']['notesdestpath']['value'] = 'D:\foo\bar'
@@ -1760,6 +1781,7 @@ Describe 'Convert-OneNotePage' -Tag 'Unit' {
 
             Assert-MockCalled -CommandName Get-ChildItem -Times 1 -Scope It
             Assert-MockCalled -CommandName Move-Item -Times 1 -Scope It
+            Assert-MockCalled -CommandName Move-Item -ParameterFilter { (Split-Path $Destination -Leaf) -eq "$( $params['ConversionConfig']['mediaNamePrefix'] )-image.jpg" } -Times 1 -Scope It
         }
 
         It "Does not halt conversion if renaming image(s) fails" {
