@@ -1137,6 +1137,78 @@ Describe 'New-SectionGroupConversionConfig' -Tag 'Unit' {
             }
         }
 
+        It "Should honor config mediaLinkFormat" {
+            $params['Config']['mediaLinkFormat']['value'] = 2
+            $params['Config']['mdFileNameAndFolderNameMaxLength']['value'] = 100 # So that page names are truncated to 100 characters
+            $fakeHierarchy = Get-FakeOneNoteHierarchy
+            $pages = $fakeHierarchy.SelectNodes("//*[local-name()='Page']")
+            $pages[0].SetAttribute('name', 'C# notes ^1 f(g(x))')
+            $pages[1].SetAttribute('name', 'a' * 100) # A subpage of the first page
+            $pages[2].SetAttribute('name', 'b' * 100) # A subpage of the subpage, so that the prefix of media file names is longer than 200 characters
+            $params['SectionGroups'] = $fakeHierarchy.Notebooks.Notebook
+
+            $result = @( New-SectionGroupConversionConfig @params 6>$null )
+
+            # 15 pages from 'test' notebook, 15 pages from 'test2' notebook
+            $result.Count | Should -Be 48
+
+            # Media file names should be unique across notebooks, start with the notebook name, not contain '#' or '^', and their prefix should be no longer than 200 characters
+            $result | Group-Object { $_['mediaNamePrefix'] } | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name } | Should -Be $null
+            foreach ($pageCfg in $result) {
+                $pageCfg['mediaNamePrefix'] | Should -Match "^$( [regex]::Escape($pageCfg['notebookName']) )-"
+                $pageCfg['mediaNamePrefix'] | Should -Not -Match '[#^]'
+                $pageCfg['mediaNamePrefix'].Length | Should -BeLessOrEqual 200
+                foreach ($attachmentCfg in $pageCfg['insertedAttachments']) {
+                    $attachmentCfg['nameCompat'] | Should -Be "$( $pageCfg['mediaNamePrefix'] )-$( $attachmentCfg['object'].preferredName | Remove-InvalidFileNameCharsInsertedFiles )"
+                    Split-Path $attachmentCfg['destination'] -Leaf | Should -Be $attachmentCfg['nameCompat']
+                }
+            }
+            $result[0]['mediaNamePrefix'] | Should -Be 'test-s0-C--notes--1-f(g(x))'
+            $result[1]['mediaNamePrefix'] | Should -Be "test-s0-C--notes--1-f(g(x))-$( 'a' * 100 )"
+            $result[2]['mediaNamePrefix'] | Should -Match "^test-s0-C--notes--1-f\(g\(x\)\)-$( 'a' * 100 )-b+-[0-9a-f]{8}$"
+
+            # Mutate
+            $pageCfg = $result[0]
+            $fakeMarkdownContent = @(
+                "![some \[text\]]($( $pageCfg['mediaPathPandoc'] )/$( $pageCfg['mediaNamePrefix'] )-image1.png){width=`"1in`" height=`"2in`"}"
+                "![]($( $pageCfg['mediaPathPandoc'] )/$( $pageCfg['mediaNamePrefix'] )-image2.png)![]($( $pageCfg['mediaPathPandoc'] )/$( $pageCfg['mediaNamePrefix'] )-image3.png)"
+                $pageCfg['insertedAttachments'][0]['object'].preferredName
+            ) -join "`n"
+            $mutated = $fakeMarkdownContent
+            foreach ($m in $pageCfg['mutations']) {
+                foreach ($r in $m['replacements']) {
+                    $mutated = $mutated -replace $r['searchRegex'], $r['replacement']
+                }
+            }
+
+            # Should use wikilinks for images and attachments. Ignore first 8 lines for page header
+            $split = $mutated -split "`n"
+            $split[8] | Should -Be "![[$( $pageCfg['mediaNamePrefix'] )-image1.png]]"
+            $split[9] | Should -Be "![[$( $pageCfg['mediaNamePrefix'] )-image2.png]]![[$( $pageCfg['mediaNamePrefix'] )-image3.png]]"
+            $split[10] | Should -Be "[[$( $pageCfg['insertedAttachments'][0]['nameCompat'] )]]"
+
+            $params['Config']['mediaLinkFormat']['value'] = 1
+
+            $result = @( New-SectionGroupConversionConfig @params 6>$null )
+
+            # Should use markdown links with relative paths
+            $pageCfg = $result[0]
+            $pageCfg['mediaNamePrefix'] | Should -Be 's0-C#-notes-^1-f(g(x))'
+            $pageCfg['insertedAttachments'][0]['nameCompat'] | Should -Be ($pageCfg['insertedAttachments'][0]['object'].preferredName | Remove-InvalidFileNameCharsInsertedFiles)
+            $mutated = @(
+                "![some \[text\]]($( $pageCfg['mediaPathPandoc'] )/$( $pageCfg['mediaNamePrefix'] )-image1.png){width=`"1in`" height=`"2in`"}"
+                $pageCfg['insertedAttachments'][0]['object'].preferredName
+            ) -join "`n"
+            foreach ($m in $pageCfg['mutations']) {
+                foreach ($r in $m['replacements']) {
+                    $mutated = $mutated -replace $r['searchRegex'], $r['replacement']
+                }
+            }
+            $split = $mutated -split "`n"
+            $split[8] | Should -Be "![some [text]]($( $pageCfg['levelsPrefix'] )media/$( $pageCfg['mediaNamePrefix'] )-image1.png){width=`"1in`" height=`"2in`"}"
+            $split[9] | Should -Be "[$( $pageCfg['insertedAttachments'][0]['nameCompat'] )]($( $pageCfg['levelsPrefix'] )media/$( $pageCfg['insertedAttachments'][0]['nameCompat'] ))"
+        }
+
         It "Should honor config conversion" {
             $params['Config']['conversion']['value'] = 'gfm+pipe_tables'
 
