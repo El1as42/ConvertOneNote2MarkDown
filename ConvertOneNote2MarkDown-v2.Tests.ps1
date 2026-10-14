@@ -1784,12 +1784,12 @@ Describe 'Convert-OneNotePage' -Tag 'Unit' {
             Assert-MockCalled -CommandName Move-Item -ParameterFilter { (Split-Path $Destination -Leaf) -eq "$( $params['ConversionConfig']['mediaNamePrefix'] )-image.jpg" } -Times 1 -Scope It
         }
 
-        It "Does not halt conversion if renaming image(s) fails" {
+        It "Does not halt conversion if renaming image(s) fails, and reports the image's destination path" {
             Mock Move-Item { throw }
 
             $err = Convert-OneNotePage @params 6>$null 2>&1
 
-            $err.Exception.Message | Select-Object -First 1 | Should -match 'Failed to rename image'
+            $err.Exception.Message | Select-Object -First 1 | Should -match "Failed to rename image .+ to $( [regex]::Escape([io.path]::combine( $params['ConversionConfig']['mediaPath'], "$( $params['ConversionConfig']['mediaNamePrefix'] )-image.jpg" )) )\."
         }
 
         It "Markdown Mutation: Rename page image references in markdown to unique names" {

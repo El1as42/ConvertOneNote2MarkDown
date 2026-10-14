@@ -1254,7 +1254,7 @@ Function Convert-OneNotePage {
                             $item = Move-Item -Path "$( $image.FullName )" -Destination $newimagePath -Force -ErrorAction Stop -PassThru
                         }
                     }catch {
-                        Write-Error "Failed to rename image $( $image.FullName ) to $( $item.FullName ). Exception: $( $_.Exception.Message )" -ErrorAction Continue
+                        Write-Error "Failed to rename image $( $image.FullName ) to $( $newimagePath ). Exception: $( $_.Exception.Message )" -ErrorAction Continue
                     }
                     # Mutate markdown content with new image references
                     try {
